@@ -1,6 +1,5 @@
 package stocks;
 
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
@@ -18,21 +17,33 @@ public class StockEntry {
     }
 
     public StockEntry(ByteBuffer bb) {
-        this.id = bb.getLong(); // 8 bytes for id
-
-        short nameLength = bb.getShort(); // 2 bytes for name length
-        if (bb.remaining() < nameLength) {
-            throw new IllegalArgumentException("ByteBuffer does not contain enough data for name. Required: " + nameLength + ", Remaining: " + bb.remaining());
+        if (bb.remaining() < 8) {
+            throw new IllegalArgumentException("Error parsing StockEntry: Insufficient data for 'id'. Required: 8 bytes, Remaining: " + bb.remaining());
         }
+        this.id = bb.getLong();
 
+        if (bb.remaining() < 2) {
+            throw new IllegalArgumentException("Error parsing StockEntry: Insufficient data for 'name length'. Required: 2 bytes, Remaining: " + bb.remaining());
+        }
+        short nameLength = bb.getShort();
+
+        if (bb.remaining() < nameLength) {
+            throw new IllegalArgumentException("Error parsing StockEntry: Insufficient data for 'name'. Required: " + nameLength + " bytes, Remaining: " + bb.remaining());
+        }
         byte[] nameBytes = new byte[nameLength];
-        bb.get(nameBytes); // read name bytes
+        bb.get(nameBytes);
         this.name = new String(nameBytes, StandardCharsets.UTF_8);
 
-        this.ts = bb.getLong(); // 8 bytes for timestamp
-        this.value = bb.getDouble(); // 8 bytes for value
-    }
+        if (bb.remaining() < 8) {
+            throw new IllegalArgumentException("Error parsing StockEntry: Insufficient data for 'timestamp'. Required: 8 bytes, Remaining: " + bb.remaining());
+        }
+        this.ts = bb.getLong();
 
+        if (bb.remaining() < 8) {
+            throw new IllegalArgumentException("Error parsing StockEntry: Insufficient data for 'market value'. Required: 8 bytes, Remaining: " + bb.remaining());
+        }
+        this.value = bb.getDouble();
+    }
 
     public long getId() {
         return this.id;
@@ -51,7 +62,7 @@ public class StockEntry {
     }
 
     public int getSerializedLength() {
-        return 3 * 8 + 2 + name.getBytes().length;
+        return 8 + 2 + name.getBytes(StandardCharsets.UTF_8).length + 8 + 8;
     }
 
     @Override
@@ -63,24 +74,19 @@ public class StockEntry {
         byte[] nameBytes = name.getBytes(StandardCharsets.UTF_8);
         ByteBuffer buffer = ByteBuffer.allocate(getSerializedLength());
 
-        // Write ID (8 bytes)
         buffer.putLong(id);
-
-        // Write name length (2 bytes) and name (nameLength bytes)
         buffer.putShort((short) nameBytes.length);
         buffer.put(nameBytes);
-
-        // Write timestamp (8 bytes)
         buffer.putLong(ts);
-
-        // Write market value (8 bytes)
         buffer.putDouble(value);
 
-        buffer.flip(); // Prepare buffer for reading
+        buffer.flip();
         return buffer;
     }
 
+    @Override
     public boolean equals(Object obj) {
+        if (this == obj) return true;
         if (obj instanceof StockEntry) {
             StockEntry entry = (StockEntry) obj;
             return id == entry.id && name.equals(entry.name) && ts == entry.ts && value == entry.value;
