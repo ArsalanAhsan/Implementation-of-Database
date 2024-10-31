@@ -1,5 +1,6 @@
 package stocks;
 
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
@@ -17,22 +18,21 @@ public class StockEntry {
     }
 
     public StockEntry(ByteBuffer bb) {
-        this.id = bb.getLong();
+        this.id = bb.getLong(); // 8 bytes for id
 
-        // Read name length (2 bytes)
-        int nameLength = bb.getShort();
+        short nameLength = bb.getShort(); // 2 bytes for name length
+        if (bb.remaining() < nameLength) {
+            throw new IllegalArgumentException("ByteBuffer does not contain enough data for name. Required: " + nameLength + ", Remaining: " + bb.remaining());
+        }
 
-        // Read name (nameLength bytes)
         byte[] nameBytes = new byte[nameLength];
-        bb.get(nameBytes);
+        bb.get(nameBytes); // read name bytes
         this.name = new String(nameBytes, StandardCharsets.UTF_8);
 
-        // Read timestamp (8 bytes)
-        this.ts = bb.getLong();
-
-        // Read market value (8 bytes)
-        this.value = bb.getDouble();
+        this.ts = bb.getLong(); // 8 bytes for timestamp
+        this.value = bb.getDouble(); // 8 bytes for value
     }
+
 
     public long getId() {
         return this.id;
